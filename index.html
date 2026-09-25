@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Las piedras mágicas - Montaña de las Restas</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;padding:16px;font-family:Arial,sans-serif;background:#eef5f7;color:#24323a}
+main{max-width:780px;margin:auto}
+.game{background:#eef5ea;border:2px solid #b8cfb3;border-radius:24px;padding:18px}
+.top{display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap}
+h1{margin:0;color:#624a38;font-size:clamp(1.4rem,5vw,2.1rem)}
+.score{background:white;border-radius:999px;padding:9px 14px;font-weight:bold;color:#624a38}
+.story{margin:12px 0;background:#fffdf5;border-radius:16px;padding:14px;line-height:1.5}
+.mountain{background:linear-gradient(#dff2ff,#e5efd9);border-radius:20px;padding:14px;text-align:center}
+.path{display:flex;justify-content:center;gap:7px;flex-wrap:wrap;margin:10px 0}
+.stone{width:52px;height:45px;border-radius:50% 50% 40% 40%;background:#aaa;border:3px solid #858585;display:flex;align-items:center;justify-content:center;font-size:1.25rem}
+.stone.magic{background:#e9c75c;border-color:#b68c28}
+.challenge{background:#fff;border-radius:18px;padding:16px;margin-top:14px;text-align:center}
+.visual{font-size:clamp(1.7rem,7vw,2.8rem);min-height:66px;line-height:1.4}
+.equation{font-size:clamp(1.8rem,7vw,2.6rem);font-weight:900;color:#624a38;margin:8px 0}
+.choices{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px}
+button{min-height:50px;border-radius:14px;border:2px solid #d3c39f;background:#fff;font-size:1.15rem;font-weight:bold;cursor:pointer;color:#24323a}
+button:hover{background:#fff8dc} button:focus{outline:3px solid #35669a;outline-offset:2px}
+.message{min-height:32px;margin-top:10px;font-weight:bold}
+.next{display:none;margin:10px auto 0;background:#624a38;color:white;border:0;padding:10px 17px}
+.final{display:none;text-align:center;background:#fffdf5;border-radius:18px;padding:22px;margin-top:14px}
+.restart{background:#3f8255;color:white;border:0;padding:10px 18px}
+.big{font-size:3.5rem}
+.hint{font-size:.95rem;color:#53645b}
+@media(max-width:430px){body{padding:8px}.game{padding:12px}.choices{grid-template-columns:1fr 1fr}.stone{width:43px;height:40px}}
+</style>
+</head>
+<body>
+<main>
+<section class="game">
+<div class="top">
+<h1>⛰️ Nivel 2 · Las piedras mágicas</h1>
+<div class="score" aria-live="polite">💎 Piedras: <span id="score">0</span>/8</div>
+</div>
+
+<div class="story">Una barrera bloquea el camino por la <strong>Montaña de las Restas</strong>. Para avanzar, debes recuperar 8 piedras mágicas. Observa los objetos, quita la cantidad indicada y resuelve cada resta. ¡Cada respuesta correcta activa una piedra!</div>
+
+<section class="mountain">
+<div aria-hidden="true" style="font-size:2.2rem">🌲 ⛰️ ☁️ 🦅 ⛰️ 🌲</div>
+<div class="path" id="path" aria-label="Progreso de piedras mágicas"></div>
+<div class="hint">Activa las 8 piedras para abrir el camino.</div>
+</section>
+
+<section class="challenge" id="challenge">
+<div id="round"><strong>Reto 1 de 8</strong></div>
+<div class="visual" id="visual"></div>
+<div class="equation" id="equation"></div>
+<div class="choices" id="choices"></div>
+<div class="message" id="message" aria-live="polite"></div>
+<button class="next" id="next" type="button">➡️ Siguiente reto</button>
+</section>
+
+<section class="final" id="final">
+<div class="big">💎✨⛰️✨🏆</div>
+<h2>¡Misión cumplida!</h2>
+<p>Recuperaste las 8 piedras mágicas y abriste el camino de la montaña.</p>
+<p><strong>🏅 Insignia: Explorador de las Restas</strong></p>
+<button class="restart" id="restart" type="button">🔄 Jugar otra vez</button>
+</section>
+</section>
+</main>
+
+<script>
+const rounds=[
+ {a:7,b:2,obj:'⭐',opts:[4,5,6]},
+ {a:8,b:3,obj:'🍎',opts:[4,5,6]},
+ {a:9,b:4,obj:'💎',opts:[5,6,7]},
+ {a:10,b:3,obj:'🪨',opts:[6,7,8]},
+ {a:8,b:5,obj:'🌸',opts:[2,3,4]},
+ {a:12,b:4,obj:'🪙',opts:[7,8,9]},
+ {a:11,b:6,obj:'🍄',opts:[4,5,6]},
+ {a:14,b:5,obj:'⭐',opts:[8,9,10]}
+];
+let index=0,score=0,locked=false;
+const el=id=>document.getElementById(id);
+
+function drawPath(){
+ el('path').innerHTML='';
+ for(let i=0;i<8;i++){
+  const s=document.createElement('div');
+  s.className='stone'+(i<score?' magic':'');
+  s.textContent=i<score?'💎':'🪨';
+  s.setAttribute('aria-label',i<score?'Piedra activada':'Piedra pendiente');
+  el('path').appendChild(s);
+ }
+}
+function icons(symbol,n){return Array(n).fill(symbol).join('')}
+function render(){
+ locked=false;
+ const r=rounds[index];
+ el('round').innerHTML='<strong>Reto '+(index+1)+' de 8</strong>';
+ el('visual').innerHTML='<div>'+icons(r.obj,r.a)+'</div><div style="font-size:1rem">Quita '+r.b+' '+r.obj+'</div>';
+ el('equation').textContent=r.a+' − '+r.b+' = ?';
+ el('choices').innerHTML='';
+ el('message').textContent='';
+ el('next').style.display='none';
+ r.opts.forEach(v=>{
+  const b=document.createElement('button');
+  b.type='button'; b.textContent=v;
+  b.addEventListener('click',()=>check(v));
+  el('choices').appendChild(b);
+ });
+ drawPath();
+}
+function check(v){
+ if(locked)return;
+ const r=rounds[index];
+ if(v===r.a-r.b){
+  locked=true; score++; el('score').textContent=score;
+  el('message').textContent='🎉 ¡Correcto! Activaste una piedra mágica.';
+  el('message').style.color='#3f8255';
+  [...el('choices').children].forEach(b=>b.disabled=true);
+  drawPath();
+  el('next').textContent=index===7?'⛰️ Abrir el camino':'➡️ Siguiente reto';
+  el('next').style.display='block';
+ }else{
+  el('message').textContent='🌟 Inténtalo otra vez. Cuenta los objetos y quita la cantidad indicada.';
+  el('message').style.color='#ad5149';
+ }
+}
+el('next').addEventListener('click',()=>{
+ if(index<7){index++;render()}
+ else{el('challenge').style.display='none';el('final').style.display='block'}
+});
+el('restart').addEventListener('click',()=>{
+ index=0;score=0;el('score').textContent='0';
+ el('challenge').style.display='block';el('final').style.display='none';render();
+});
+drawPath();render();
+</script>
+</body>
+</html>
